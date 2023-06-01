@@ -11,7 +11,7 @@
 ;(require :sdl2kit)
 (require :cl-opengl)
 
-;;; Linear algebra stuff
+;;; Vector stuff
 (defstruct vec2 v1 v2)
 
 (defun sqr (n)
@@ -119,7 +119,7 @@
 	       :v2 (* len (sin adjusted-angle))))))
 
 (defun draw-min-hand (renderer angle)
-  (draw-hand renderer (* 80 (/ *screen-height* 200)) (/ pi 4) *screen-height*))
+  (draw-hand renderer (* 80 (/ *screen-height* 200)) *min-angle* *screen-height*))
 
 (defun draw-hour-hand (renderer angle)
   (draw-hand renderer (* 50 (/ *screen-height* 200)) angle *screen-height*))
@@ -131,6 +131,7 @@
 (defparameter *origin-x* 200)
 (defparameter *origin-y* 200)
 (defparameter *zero-angle* (- (/ pi 2)))
+(defparameter *min-angle* (/ pi 4))
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
@@ -142,24 +143,36 @@
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
          ,@body))))
 
-;; (multiple-value-bind
-;;       (sec min hour)
-;;       (get-decoded-time)
-;;   min)
+(defun update-time ()
+  (multiple-value-bind (sec min hour) (get-decoded-time))
+  (setf *min-angle* (+ *min-angle* (/ pi 6))))
+
+(defun start-timer ()
+  (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 1.0))
+
+(defun stop-timers ()
+  (dolist (timer (sb-ext:list-all-timers))
+    (sb-ext:unschedule-timer timer)))
 
 (defun run ()
+  (start-timer)
   (with-window-renderer (window renderer)
     (sdl2:with-event-loop (:method :poll)
       (:quit () t)
       (:wait () t)
-      ;; (:keydown (:keysym keysym)
-      ;; 		(case (sdl2:scancode keysym)
-      ;; 		  (:scancode-escape (sdl2:quit))))
+
+      (:keydown (:keysym keysym)
+		(case (sdl2:scancode keysym)
+		  (:scancode-escape
+		   (stop-timers)
+		   ;; (sdl2:quit)
+		   )))
+      
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
-					;	     (draw-hand renderer 80 (/ pi 2) *screen-height*)
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
+	     
 	     (draw-circle (lambda (x y)
 			    (sdl2:render-draw-point renderer x y))
 			  200 200 *clock-radius*)
@@ -169,5 +182,4 @@
 	     (draw-hour-hand renderer 0)
 	     
 	     (sdl2:delay 80)
-	     (sdl2:render-present renderer)
-	     ))))
+	     (sdl2:render-present renderer)))))

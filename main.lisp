@@ -2,15 +2,37 @@
   (:use :cl))
 
 (ql:quickload "sdl2")
-(ql:quickload "sdl2kit")
+;(ql:quickload "sdl2kit")
 (ql:quickload "cl-opengl")
 
 (in-package #:clock)
 
 (require :sdl2)
-(require :sdl2kit)
+;(require :sdl2kit)
 (require :cl-opengl)
 
+;;; Linear algebra stuff
+(defstruct vec2 v1 v2)
+
+(defun sqr (n)
+  (expt n 2))
+
+(defun magnitude (vec)
+  (sqrt (+ (sqr (vec2-v1 vec))
+	   (sqr (vec2-v2 vec)))))
+
+(defun *vec (n vec)
+  (make-vec2 :v1 (* n (vec2-v1 vec))
+	     :v2 (* n (vec2-v2 vec))))
+
+(defun -vec (v1 v2)
+  (make-vec2 :v1 (- (vec2-v1 v1) (vec2-v1 v2))
+             :v2 (- (vec2-v2 v1) (vec2-v2 v2))))
+
+(defun normalize (vec)
+  (*vec (/ 1 (magnitude vec)) vec))
+
+;;; Draw functions
 (defun draw-circle (draw-function x0 y0 radius)
   (labels ((f (x y)
              (funcall draw-function x y))
@@ -41,39 +63,111 @@
     (put 0 radius (- 5 (* 4 radius)))
     (values)))
 
-(defparameter *screen-width* 640)
-(defparameter *screen-height* 480)
+;;; Clock
+(defparameter *1second* 1000)
+
+(defun mark-at-angle (angle)
+  (let* ((magnitude 10)
+	 (radius (/ *screen-height* 2))
+	 (offset (/ *screen-height* 2))
+	 (x-start (+ offset (* radius (cos angle))))
+	 (y-start (+ offset (* radius (sin angle))))
+	 (origin (make-vec2 :v1 offset :v2 offset))
+	 (dir (*vec magnitude
+		    (normalize
+		     (-vec origin (make-vec2 :v1 x-start :v2 y-start)))))
+	 (x-end (+ x-start (vec2-v1 dir)))
+	 (y-end (+ y-start (vec2-v2 dir))))
+    (values (coerce x-start 'single-float)
+	    (coerce y-start 'single-float)
+	    (coerce x-end 'single-float)
+	    (coerce y-end 'single-float))))
+
+(defparameter *mark-angles*
+  (loop for n from 0 to 12
+	for a = (* n (/ pi 6))
+	:collect a))
+
+(defun drawline (renderer from to)
+  (let ((x0 (vec2-v1 from))
+	(y0 (vec2-v2 from))
+	(x1 (vec2-v1 to))
+	(y1 (vec2-v2 to)))
+    (sdl2-ffi.functions:sdl-render-draw-line-f
+     renderer
+     (coerce x0 'single-float)
+     (coerce y0 'single-float)
+     (coerce (+ x0 x1) 'single-float)
+     (coerce (+ y0 y1) 'single-float))))
+
+(defun draw-mark-at-angle (renderer angle)
+  (multiple-value-bind (x0 y0 x y)
+      (mark-at-angle angle)
+    (sdl2-ffi.functions:sdl-render-draw-line-f renderer x0 y0 x y)))
+
+(defun draw-marks (renderer)
+  (dolist (angle *mark-angles*)
+    (draw-mark-at-angle renderer angle)))
+
+(defun draw-hand (renderer len angle win-h)
+  (let ((adjusted-angle (+ *zero-angle* angle))
+	(x0 (/ win-h 2)))
+    (drawline renderer
+	      (make-vec2 :v1 x0 :v2 x0)
+	      (make-vec2
+	       :v1 (* len (cos adjusted-angle))
+	       :v2 (* len (sin adjusted-angle))))))
+
+(defun draw-min-hand (renderer angle)
+  (draw-hand renderer (* 80 (/ *screen-height* 200)) (/ pi 4) *screen-height*))
+
+(defun draw-hour-hand (renderer angle)
+  (draw-hand renderer (* 50 (/ *screen-height* 200)) angle *screen-height*))
+
+;;; Main
+(defparameter *screen-width* 400)
+(defparameter *screen-height* 400)
 (defparameter *clock-radius* 200)
+(defparameter *origin-x* 200)
+(defparameter *origin-y* 200)
+(defparameter *zero-angle* (- (/ pi 2)))
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
      (sdl2:with-window (,window
-                        :title "SDL2 Tutorial 07"
+                        :title "clock"
                         :w *screen-width*
                         :h *screen-height*
                         :flags '(:shown))
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
          ,@body))))
 
+;; (multiple-value-bind
+;;       (sec min hour)
+;;       (get-decoded-time)
+;;   min)
+
 (defun run ()
   (with-window-renderer (window renderer)
-
-    (defun draw-point (x y)
-      (sdl2:render-draw-point renderer x y))
-    
-    (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-
     (sdl2:with-event-loop (:method :poll)
       (:quit () t)
+      (:wait () t)
+      ;; (:keydown (:keysym keysym)
+      ;; 		(case (sdl2:scancode keysym)
+      ;; 		  (:scancode-escape (sdl2:quit))))
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
-
+					;	     (draw-hand renderer 80 (/ pi 2) *screen-height*)
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	     (draw-circle #'draw-point (/ *screen-width* 2) (/ *screen-height* 2) *clock-radius*)
-             (sdl2:render-draw-line renderer
-                                    0
-                                    (/ *screen-height* 2)
-                                    *screen-width*
-                                    (/ *screen-height* 2))
-	     (sdl2:render-present renderer)))))
+	     (draw-circle (lambda (x y)
+			    (sdl2:render-draw-point renderer x y))
+			  200 200 *clock-radius*)
+
+	     (draw-marks renderer)
+	     (draw-min-hand renderer (/ pi 4))
+	     (draw-hour-hand renderer 0)
+	     
+	     (sdl2:delay 80)
+	     (sdl2:render-present renderer)
+	     ))))

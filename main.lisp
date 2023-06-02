@@ -65,6 +65,29 @@
 
 ;;; Clock
 (defparameter *1second* 1000)
+(defparameter *1min-rad* (/ pi 30))
+(defparameter *1hour-rad* (/ pi 6))
+
+(defun mil-hour (hour)
+  (cond
+    ((zerop hour) 12)
+    ((>= hour 13) (- hour 12))
+    (t hour)))
+
+(defun min->rad (min) (* min *1min-rad*))
+(defun hour->rad (hour min)
+  (if (>= min 60) hour
+      (* (+ hour (/ min 60)) *1hour-rad*)))
+
+(defun update-time ()
+  (multiple-value-bind (_ min hour) (get-decoded-time)
+    (setf *min-angle* (min->rad min)
+	  *hour-angle* (hour->rad (mil-hour hour) min))))
+
+(defun values-of (type &rest args)
+  (values-list
+   (loop for a in args
+	 collect (coerce a type))))
 
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
@@ -78,10 +101,11 @@
 		     (-vec origin (make-vec2 :v1 x-start :v2 y-start)))))
 	 (x-end (+ x-start (vec2-v1 dir)))
 	 (y-end (+ y-start (vec2-v2 dir))))
-    (values (coerce x-start 'single-float)
-	    (coerce y-start 'single-float)
-	    (coerce x-end 'single-float)
-	    (coerce y-end 'single-float))))
+    (values-of 'single-float
+	       x-start 
+	       y-start
+	       x-end
+	       y-end)))
 
 (defparameter *mark-angles*
   (loop for n from 0 to 12
@@ -122,7 +146,7 @@
   (draw-hand renderer (* 80 (/ *screen-height* 200)) *min-angle* *screen-height*))
 
 (defun draw-hour-hand (renderer angle)
-  (draw-hand renderer (* 50 (/ *screen-height* 200)) angle *screen-height*))
+  (draw-hand renderer (* 50 (/ *screen-height* 200)) *hour-angle* *screen-height*))
 
 ;;; Main
 (defparameter *screen-width* 400)
@@ -131,7 +155,8 @@
 (defparameter *origin-x* 200)
 (defparameter *origin-y* 200)
 (defparameter *zero-angle* (- (/ pi 2)))
-(defparameter *min-angle* (/ pi 4))
+(defparameter *min-angle* 0)
+(defparameter *hour-angle* 0)
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
@@ -143,19 +168,16 @@
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
          ,@body))))
 
-(defun update-time ()
-  (multiple-value-bind (sec min hour) (get-decoded-time))
-  (setf *min-angle* (+ *min-angle* (/ pi 6))))
-
 (defun start-timer ()
-  (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 1.0))
+  (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 30.0))
 
 (defun stop-timers ()
   (dolist (timer (sb-ext:list-all-timers))
     (sb-ext:unschedule-timer timer)))
 
 (defun run ()
-  (start-timer)
+  (update-time)
+;  (start-timer)
   (with-window-renderer (window renderer)
     (sdl2:with-event-loop (:method :poll)
       (:quit () t)
@@ -178,8 +200,8 @@
 			  200 200 *clock-radius*)
 
 	     (draw-marks renderer)
-	     (draw-min-hand renderer (/ pi 4))
-	     (draw-hour-hand renderer 0)
+	     (draw-min-hand renderer *min-angle*)
+	     (draw-hour-hand renderer *hour-angle*)
 	     
-	     (sdl2:delay 80)
+	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))

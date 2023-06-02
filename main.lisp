@@ -89,10 +89,14 @@
    (loop for a in args
 	 collect (coerce a type))))
 
+(defun list-of (type &rest args)
+  (loop for a in args
+	 collect (coerce a type)))
+
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
 	 (radius (/ *screen-height* 2))
-	 (offset (/ *screen-height* 2))
+	 (offset (+ *padding* (/ *screen-height* 2)))
 	 (x-start (+ offset (* radius (cos angle))))
 	 (y-start (+ offset (* radius (sin angle))))
 	 (origin (make-vec2 :v1 offset :v2 offset))
@@ -127,7 +131,12 @@
 (defun draw-mark-at-angle (renderer angle)
   (multiple-value-bind (x0 y0 x y)
       (mark-at-angle angle)
-    (sdl2-ffi.functions:sdl-render-draw-line-f renderer x0 y0 x y)))
+    (sdl2-ffi.functions:sdl-render-draw-line-f
+     renderer
+     x0
+     y0
+     x
+     y)))
 
 (defun draw-marks (renderer)
   (dolist (angle *mark-angles*)
@@ -135,7 +144,7 @@
 
 (defun draw-hand (renderer len angle win-h)
   (let ((adjusted-angle (+ *zero-angle* angle))
-	(x0 (/ win-h 2)))
+	(x0 (+ *padding* (/ win-h 2))))
     (drawline renderer
 	      (make-vec2 :v1 x0 :v2 x0)
 	      (make-vec2
@@ -151,12 +160,17 @@
 ;;; Main
 (defparameter *screen-width* 400)
 (defparameter *screen-height* 400)
-(defparameter *clock-radius* 200)
+
+(defparameter *clock-radius* (/ *screen-height* 2))
 (defparameter *origin-x* 200)
 (defparameter *origin-y* 200)
+
 (defparameter *zero-angle* (- (/ pi 2)))
 (defparameter *min-angle* 0)
 (defparameter *hour-angle* 0)
+
+(defparameter *padding* 0)
+(defparameter *offset* (+ *padding* (/ *screen-height* 2)))
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
@@ -175,9 +189,21 @@
   (dolist (timer (sb-ext:list-all-timers))
     (sb-ext:unschedule-timer timer)))
 
+(defun printf (format-str &rest args)
+  (destructuring-bind (a) args
+      (print (format nil format-str a))))
+
+;;; TODO: This is shit
+(defun handle-window-event (w)
+  (let ((size (sdl2:get-window-size w)))
+    (setf *screen-height* size
+	  *screen-width* size
+	  *clock-radius* (round (/ size 2))
+	  *offset* (+ *padding* (/ *screen-height* 2)))))
+
 (defun run ()
   (update-time)
-;  (start-timer)
+  ;; (start-timer)
   (with-window-renderer (window renderer)
     (sdl2:with-event-loop (:method :poll)
       (:quit () t)
@@ -189,6 +215,9 @@
 		   (stop-timers)
 		   ;; (sdl2:quit)
 		   )))
+
+      (:windowevent ()
+		    (handle-window-event window))
       
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
@@ -196,8 +225,10 @@
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
 	     
 	     (draw-circle (lambda (x y)
-			    (sdl2:render-draw-point renderer x y))
-			  200 200 *clock-radius*)
+			    (sdl2:render-draw-point renderer (+ x *padding*) (+ y *padding*)))
+			  (round (/ *screen-height* 2))
+			  (round (/ *screen-width* 2))
+			  *clock-radius*)
 
 	     (draw-marks renderer)
 	     (draw-min-hand renderer *min-angle*)

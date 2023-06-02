@@ -64,9 +64,9 @@
     (values)))
 
 ;;; Clock
-(defparameter *1second* 1000)
-(defparameter *1min-rad* (/ pi 30))
-(defparameter *1hour-rad* (/ pi 6))
+(defvar *1second* 1000)
+(defvar *1min-rad* (/ pi 30))
+(defvar *1hour-rad* (/ pi 6))
 
 (defun mil-hour (hour)
   (cond
@@ -133,10 +133,8 @@
       (mark-at-angle angle)
     (sdl2-ffi.functions:sdl-render-draw-line-f
      renderer
-     x0
-     y0
-     x
-     y)))
+     x0 y0
+     x y)))
 
 (defun draw-marks (renderer)
   (dolist (angle *mark-angles*)

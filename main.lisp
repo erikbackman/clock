@@ -123,14 +123,6 @@
     (values x-start y-start
 	    x-end y-end)))
 
-(defun draw-mark-at-angle (renderer angle)
-  (multiple-value-bind (x0 y0 x y)
-      (mark-at-angle angle)
-    (sdl2-ffi.functions:sdl-render-draw-line-f
-     renderer
-     x0 y0
-     x y)))
-
 (defvar *mark-angles*
   (let ((step (/ pi 6)))
     (loop for n from 0 to 12
@@ -139,7 +131,11 @@
 
 (defun draw-marks (renderer)
   (dolist (angle *mark-angles*)
-    (draw-mark-at-angle renderer angle)))
+    (multiple-value-bind (x0 y0 x y) (mark-at-angle angle)
+      (sdl2-ffi.functions:sdl-render-draw-line-f
+       renderer
+       x0 y0
+       x y))))
 
 (defun draw-hand (renderer len angle win-h)
   (let* ((adjusted-angle (+ *zero-angle* angle))

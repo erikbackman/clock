@@ -68,7 +68,7 @@
 (defvar *1hour-rad* (/ pi 6))
 
 (defparameter *clock-radius* (/ *window-height* 2))
-(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock (pi/2)
+(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
 (defparameter *min* 0)
 (defparameter *hour* 0)
 
@@ -109,7 +109,7 @@
 
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
-	 (radius (- *padding* (/ *window-height* 2))) ; TODO: make sh an argument
+	 (radius (- *padding* (/ *window-height* 2))) ; TODO: make window-height an argument
 	 (offset (/ *window-height* 2))
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
@@ -160,7 +160,9 @@
 (defparameter *offset* (+ *padding* (/ *window-height* 2)))
 
 (defun start-timer ()
-  (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 30.0))
+  (let ((timer (sb-ext:make-timer #'update-time)))
+    (sb-ext:schedule-timer timer 1.0 :repeat-interval 30.0)
+    timer))
 
 (defun stop-timers ()
   (dolist (timer (sb-ext:list-all-timers))

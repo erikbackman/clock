@@ -104,8 +104,8 @@
 
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
-	 (radius (- *padding* (/ *screen-height* 2))) ; TODO: make sh an argument
-	 (offset (/ *screen-height* 2))
+	 (radius (- *padding* (/ *window-height* 2))) ; TODO: make sh an argument
+	 (offset (/ *window-height* 2))
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
 	 (y-start (+ offset (imagpart point)))
@@ -146,16 +146,16 @@
 			 :v2 (imagpart point)))))
 
 (defun draw-min-hand (renderer angle)
-  (draw-hand renderer (* 80 (/ *screen-height* 200)) angle *screen-height*))
+  (draw-hand renderer (* 80 (/ *window-height* 200)) angle *window-height*))
 
 (defun draw-hour-hand (renderer angle)
-  (draw-hand renderer (* 50 (/ *screen-height* 200)) angle *screen-height*))
+  (draw-hand renderer (* 50 (/ *window-height* 200)) angle *window-height*))
 
 ;;; Main
-(defparameter *screen-width* 500)
-(defparameter *screen-height* 500)
+(defparameter *window-width* 500)
+(defparameter *window-height* 500)
 
-(defparameter *clock-radius* (/ *screen-height* 2))
+(defparameter *clock-radius* (/ *window-height* 2))
 
 (defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock (pi/2)
 
@@ -163,7 +163,7 @@
 (defparameter *hour* 0)
 
 (defparameter *padding* 0)
-(defparameter *offset* (+ *padding* (/ *screen-height* 2)))
+(defparameter *offset* (+ *padding* (/ *window-height* 2)))
 
 (defun start-timer ()
   (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 30.0))
@@ -179,10 +179,10 @@
 ;;; TODO: This is shit
 (defun handle-window-event (w)
   (let ((size (sdl2:get-window-size w)))
-    (setf *screen-height* size
-	  *screen-width* size
+    (setf *window-height* size
+	  *window-width* size
 	  *clock-radius* (round (/ size 2))
-	  *offset* (+ *padding* (/ *screen-height* 2)))))
+	  *offset* (+ *padding* (/ *window-height* 2)))))
 
 (defun draw (wh ww min hour renderer)
   (let* ((h/2 (round (/ wh 2)))
@@ -203,8 +203,8 @@
   `(sdl2:with-init (:video)
      (sdl2:with-window (,window
                         :title "clock"
-                        :w *screen-width*
-                        :h *screen-height*
+                        :w *window-width*
+                        :h *window-height*
                         :flags '(:shown))
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
          ,@body))))
@@ -231,6 +231,6 @@
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	     (draw *screen-height* *screen-width* *min* *hour* renderer)
+	     (draw *window-height* *window-width* *min* *hour* renderer)
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))

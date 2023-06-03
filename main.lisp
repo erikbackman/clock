@@ -2,13 +2,12 @@
   (:use :cl))
 
 (ql:quickload "sdl2")
-;(ql:quickload "sdl2kit")
+;;(ql:quickload "sdl2kit")
 (ql:quickload "cl-opengl")
 
 (in-package #:clock)
 
 (require :sdl2)
-;(require :sdl2kit)
 (require :cl-opengl)
 
 ;;; Vector stuff
@@ -81,40 +80,18 @@
 
 (defun update-time ()
   (multiple-value-bind (_ min hour) (get-decoded-time)
-    (setf *min-angle* (min->rad min)
-	  *hour-angle* (hour->rad (mil-hour hour) min))))
+    (setf *min* min
+	  *hour* hour)))
+
+(defun cis-sf (angle)
+  (let ((c (cis angle)))
+    (complex (coerce (realpart c) 'single-float)
+	     (coerce (imagpart c) 'single-float))))
 
 (defun values-of (type &rest args)
   (values-list
    (loop for a in args
 	 collect (coerce a type))))
-
-(defun list-of (type &rest args)
-  (loop for a in args
-	 collect (coerce a type)))
-
-(defun mark-at-angle (angle)
-  (let* ((magnitude 10)
-	 (radius (/ *screen-height* 2))
-	 (offset (+ *padding* (/ *screen-height* 2)))
-	 (x-start (+ offset (* radius (cos angle))))
-	 (y-start (+ offset (* radius (sin angle))))
-	 (origin (make-vec2 :v1 offset :v2 offset))
-	 (dir (*vec magnitude
-		    (normalize
-		     (-vec origin (make-vec2 :v1 x-start :v2 y-start)))))
-	 (x-end (+ x-start (vec2-v1 dir)))
-	 (y-end (+ y-start (vec2-v2 dir))))
-    (values-of 'single-float
-	       x-start 
-	       y-start
-	       x-end
-	       y-end)))
-
-(defparameter *mark-angles*
-  (loop for n from 0 to 12
-	for a = (* n (/ pi 6))
-	:collect a))
 
 (defun drawline (renderer from to)
   (let ((x0 (vec2-v1 from))
@@ -122,11 +99,24 @@
 	(x1 (vec2-v1 to))
 	(y1 (vec2-v2 to)))
     (sdl2-ffi.functions:sdl-render-draw-line-f
-     renderer
-     (coerce x0 'single-float)
-     (coerce y0 'single-float)
-     (coerce (+ x0 x1) 'single-float)
-     (coerce (+ y0 y1) 'single-float))))
+     renderer x0 y0
+     (+ x0 x1) (+ y0 y1))))
+
+(defun mark-at-angle (angle)
+  (let* ((magnitude 10)
+	 (radius (/ *screen-height* 2))
+	 (offset (+ *padding* (/ *screen-height* 2)))
+	 (point (* radius (cis-sf angle)))
+	 (x-start (+ offset (realpart point)))
+	 (y-start (+ offset (imagpart point)))
+	 (origin (make-vec2 :v1 offset :v2 offset))
+	 (dir (*vec magnitude
+		    (normalize
+		     (-vec origin (make-vec2 :v1 x-start :v2 y-start)))))
+	 (x-end (+ x-start (vec2-v1 dir)))
+	 (y-end (+ y-start (vec2-v2 dir))))
+    (values x-start y-start
+	    x-end y-end)))
 
 (defun draw-mark-at-angle (renderer angle)
   (multiple-value-bind (x0 y0 x y)
@@ -136,49 +126,44 @@
      x0 y0
      x y)))
 
+(defvar *mark-angles*
+  (let ((step (/ pi 6)))
+    (loop for n from 0 to 12
+	  for a = (* n step)
+	  :collect a)))
+
 (defun draw-marks (renderer)
   (dolist (angle *mark-angles*)
     (draw-mark-at-angle renderer angle)))
 
 (defun draw-hand (renderer len angle win-h)
-  (let ((adjusted-angle (+ *zero-angle* angle))
-	(x0 (+ *padding* (/ win-h 2))))
+  (let* ((adjusted-angle (+ *zero-angle* angle))
+	 (x0 (coerce (+ *padding* (/ win-h 2)) 'single-float))
+	 (point (* len (cis-sf adjusted-angle))))
     (drawline renderer
 	      (make-vec2 :v1 x0 :v2 x0)
-	      (make-vec2
-	       :v1 (* len (cos adjusted-angle))
-	       :v2 (* len (sin adjusted-angle))))))
+	      (make-vec2 :v1 (realpart point)
+			 :v2 (imagpart point)))))
 
 (defun draw-min-hand (renderer angle)
-  (draw-hand renderer (* 80 (/ *screen-height* 200)) *min-angle* *screen-height*))
+  (draw-hand renderer (* 80 (/ *screen-height* 200)) angle *screen-height*))
 
 (defun draw-hour-hand (renderer angle)
-  (draw-hand renderer (* 50 (/ *screen-height* 200)) *hour-angle* *screen-height*))
+  (draw-hand renderer (* 50 (/ *screen-height* 200)) angle *screen-height*))
 
 ;;; Main
-(defparameter *screen-width* 400)
-(defparameter *screen-height* 400)
+(defparameter *screen-width* 500)
+(defparameter *screen-height* 500)
 
 (defparameter *clock-radius* (/ *screen-height* 2))
-(defparameter *origin-x* 200)
-(defparameter *origin-y* 200)
 
-(defparameter *zero-angle* (- (/ pi 2)))
-(defparameter *min-angle* 0)
-(defparameter *hour-angle* 0)
+(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock (pi/2)
+
+(defparameter *min* 0)
+(defparameter *hour* 0)
 
 (defparameter *padding* 0)
 (defparameter *offset* (+ *padding* (/ *screen-height* 2)))
-
-(defmacro with-window-renderer ((window renderer) &body body)
-  `(sdl2:with-init (:video)
-     (sdl2:with-window (,window
-                        :title "clock"
-                        :w *screen-width*
-                        :h *screen-height*
-                        :flags '(:shown))
-       (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
-         ,@body))))
 
 (defun start-timer ()
   (sb-ext:schedule-timer (sb-ext:make-timer #'update-time) 1.0 :repeat-interval 30.0))
@@ -199,10 +184,36 @@
 	  *clock-radius* (round (/ size 2))
 	  *offset* (+ *padding* (/ *screen-height* 2)))))
 
+(defun draw (wh ww min hour renderer)
+  (let* ((origin (round (/ wh 2)))
+	 (x0 origin)
+	 (y0 origin)
+	 (radius (round (/ wh 2))))
+    (draw-circle (lambda (x y) (sdl2:render-draw-point
+			   renderer
+			   (+ x *padding*)
+			   (+ y *padding*)))
+		 x0 y0
+		 radius)
+    (draw-marks renderer)
+    (draw-min-hand renderer (min->rad min))
+    (draw-hour-hand renderer (hour->rad hour min))))
+
+(defmacro with-window-renderer ((window renderer) &body body)
+  `(sdl2:with-init (:video)
+     (sdl2:with-window (,window
+                        :title "clock"
+                        :w *screen-width*
+                        :h *screen-height*
+                        :flags '(:shown))
+       (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
+         ,@body))))
+
 (defun run ()
   (update-time)
   ;; (start-timer)
   (with-window-renderer (window renderer)
+    (sdl2:set-hint :render-scale-quality "1")
     (sdl2:with-event-loop (:method :poll)
       (:quit () t)
       (:wait () t)
@@ -214,23 +225,12 @@
 		   ;; (sdl2:quit)
 		   )))
 
-      (:windowevent ()
-		    (handle-window-event window))
+      (:windowevent () (handle-window-event window))
       
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	     
-	     (draw-circle (lambda (x y)
-			    (sdl2:render-draw-point renderer (+ x *padding*) (+ y *padding*)))
-			  (round (/ *screen-height* 2))
-			  (round (/ *screen-width* 2))
-			  *clock-radius*)
-
-	     (draw-marks renderer)
-	     (draw-min-hand renderer *min-angle*)
-	     (draw-hour-hand renderer *hour-angle*)
-	     
+	     (draw *screen-height* *screen-width* *min* *hour* renderer)
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))

@@ -104,8 +104,8 @@
 
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
-	 (radius (/ *screen-height* 2)) ; TODO: make sh an argument
-	 (offset (+ *padding* (/ *screen-height* 2)))
+	 (radius (- *padding* (/ *screen-height* 2))) ; TODO: make sh an argument
+	 (offset (/ *screen-height* 2))
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
 	 (y-start (+ offset (imagpart point)))
@@ -138,8 +138,8 @@
 
 (defun draw-hand (renderer len angle win-h)
   (let* ((adjusted-angle (+ *zero-angle* angle))
-	 (x0 (coerce (+ *padding* (/ win-h 2)) 'single-float))
-	 (point (* len (cis-sf adjusted-angle))))
+	 (x0 (coerce (/ win-h 2) 'single-float))
+	 (point (* (- len *padding*) (cis-sf adjusted-angle))))
     (drawline renderer
 	      (make-vec2 :v1 x0 :v2 x0)
 	      (make-vec2 :v1 (realpart point)
@@ -191,10 +191,10 @@
 	 (radius h/2))
     (draw-circle (lambda (x y) (sdl2:render-draw-point
 			   renderer
-			   (+ x *padding*)
-			   (+ y *padding*)))
+			   (+ x 0)
+			   (+ y 0)))
 		 x0 y0
-		 radius)
+		 (- radius *padding*))
     (draw-marks renderer)
     (draw-min-hand renderer (min->rad min))
     (draw-hour-hand renderer (hour->rad hour min))))

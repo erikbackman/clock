@@ -67,6 +67,11 @@
 (defvar *1min-rad* (/ pi 30))
 (defvar *1hour-rad* (/ pi 6))
 
+(defparameter *clock-radius* (/ *window-height* 2))
+(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock (pi/2)
+(defparameter *min* 0)
+(defparameter *hour* 0)
+
 (defun mil-hour (hour)
   (cond
     ((zerop hour) 12)
@@ -154,13 +159,6 @@
 ;;; Main
 (defparameter *window-width* 500)
 (defparameter *window-height* 500)
-
-(defparameter *clock-radius* (/ *window-height* 2))
-
-(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock (pi/2)
-
-(defparameter *min* 0)
-(defparameter *hour* 0)
 
 (defparameter *padding* 0)
 (defparameter *offset* (+ *padding* (/ *window-height* 2)))

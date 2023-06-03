@@ -184,17 +184,12 @@
 	  *clock-radius* (round (/ size 2))
 	  *offset* (+ *padding* (/ *window-height* 2)))))
 
-(defun draw (wh ww min hour renderer)
+(defun draw (wh min hour renderer)
   (let* ((h/2 (round (/ wh 2)))
 	 (x0 h/2)
 	 (y0 h/2)
-	 (radius h/2))
-    (draw-circle (lambda (x y) (sdl2:render-draw-point
-			   renderer
-			   (+ x 0)
-			   (+ y 0)))
-		 x0 y0
-		 (- radius *padding*))
+	 (radius (- h/2 *padding*)))
+    (draw-circle (lambda (x y) (sdl2:render-draw-point renderer x y)) x0 y0 radius)
     (draw-marks renderer)
     (draw-min-hand renderer (min->rad min))
     (draw-hour-hand renderer (hour->rad hour min))))
@@ -231,6 +226,6 @@
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
 	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	     (draw *window-height* *window-width* *min* *hour* renderer)
+	     (draw *window-height* *min* *hour* renderer)
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))

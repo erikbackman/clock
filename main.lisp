@@ -104,7 +104,7 @@
 
 (defun mark-at-angle (angle)
   (let* ((magnitude 10)
-	 (radius (/ *screen-height* 2))
+	 (radius (/ *screen-height* 2)) ; TODO: make sh an argument
 	 (offset (+ *padding* (/ *screen-height* 2)))
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
@@ -185,10 +185,10 @@
 	  *offset* (+ *padding* (/ *screen-height* 2)))))
 
 (defun draw (wh ww min hour renderer)
-  (let* ((origin (round (/ wh 2)))
-	 (x0 origin)
-	 (y0 origin)
-	 (radius (round (/ wh 2))))
+  (let* ((h/2 (round (/ wh 2)))
+	 (x0 h/2)
+	 (y0 h/2)
+	 (radius h/2))
     (draw-circle (lambda (x y) (sdl2:render-draw-point
 			   renderer
 			   (+ x *padding*)

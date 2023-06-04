@@ -217,15 +217,11 @@
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
 	 ,@body))))
 
-(defun init ()
+(defun start-clock ()
   (update-time)
   (start-timer)
-  ;; TTF Init
   (with-window-renderer (window renderer)
-    (sdl2-ttf:init)
-    (setf *font* (sdl2-ttf:open-font "./fonts/Inconsolata-Regular.ttf" 24))
     (sdl2:with-event-loop (:method :poll)
-      ;; Destroy textures
       (:quit () t)
 
       (:wait () t)
@@ -234,11 +230,10 @@
 		(case (sdl2:scancode keysym)
 		  (:scancode-escape
 		   (stop-timers)
-;;		   (sdl2:quit)
+		   ;; (sdl2:quit)
 		   )))
 
       (:windowevent () (handle-window-event window))
-      ;; Render date
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
@@ -247,4 +242,4 @@
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))
 
-(defun run () (init))
+(defun run () (start-clock))

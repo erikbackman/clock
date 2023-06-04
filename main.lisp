@@ -76,8 +76,6 @@
 (defvar *1min-rad* (/ pi 30))
 (defvar *1hour-rad* (/ pi 6))
 
-(defparameter *clock-radius* (/ *window-height* 2))
-(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
 (defparameter *min* 0)
 (defparameter *hour* 0)
 
@@ -166,6 +164,9 @@
 (defparameter *window-width* 500)
 (defparameter *window-height* 500)
 
+(defparameter *clock-radius* (/ *window-height* 2))
+(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
+
 (defparameter *padding* 0)
 (defparameter *offset* (+ *padding* (/ *window-height* 2)))
 
@@ -216,12 +217,13 @@
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
 	 ,@body))))
 
-(defun init (init-state)
+(defun init ()
   (update-time)
   (start-timer)
   ;; TTF Init
   (with-window-renderer (window renderer)
     (sdl2-ttf:init)
+    (setf *font* (sdl2-ttf:open-font "./fonts/Inconsolata-Regular.ttf" 24))
     (sdl2:with-event-loop (:method :poll)
       ;; Destroy textures
       (:quit () t)
@@ -232,7 +234,7 @@
 		(case (sdl2:scancode keysym)
 		  (:scancode-escape
 		   (stop-timers)
-		   ;; (sdl2:quit)
+;;		   (sdl2:quit)
 		   )))
 
       (:windowevent () (handle-window-event window))
@@ -245,5 +247,4 @@
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))
 
-(defun run ()
-  (init init-state))
+(defun run () (init))

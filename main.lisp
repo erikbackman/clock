@@ -1,13 +1,15 @@
 (defpackage #:clock
   (:use :cl))
 
-(ql:quickload "sdl2")
-;;(ql:quickload "sdl2kit")
-(ql:quickload "cl-opengl")
-
 (in-package #:clock)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (ql:quickload "sdl2")
+  (ql:quickload "sdl2-ttf")
+  (ql:quickload "cl-opengl"))
+
 (require :sdl2)
+(require :sdl2-ttf)
 (require :cl-opengl)
 
 ;;; Vector stuff
@@ -26,39 +28,46 @@
 
 (defun -vec (v1 v2)
   (make-vec2 :v1 (- (vec2-v1 v1) (vec2-v1 v2))
-             :v2 (- (vec2-v2 v1) (vec2-v2 v2))))
+	     :v2 (- (vec2-v2 v1) (vec2-v2 v2))))
 
 (defun normalize (vec)
   (*vec (/ 1 (magnitude vec)) vec))
 
 ;;; Draw functions
+(defun draw-circle-polar (draw-function x0 y0 radius)
+  (loop for n from 0 to 360
+	for angle = (/ (* n 3.142) 180)
+	do (funcall draw-function
+		    (+ x0 (* radius (cos angle)))
+		    (+ y0 (* radius (sin angle))))))
+
 (defun draw-circle (draw-function x0 y0 radius)
   (labels ((f (x y)
-             (funcall draw-function x y))
-           (put (x y m)
-             (let ((x+ (+ x0 x))
-                   (x- (- x0 x))
-                   (y+ (+ y0 y))
-                   (y- (- y0 y))
-                   (x0y+ (+ x0 y))
-                   (x0y- (- x0 y))
-                   (xy0+ (+ y0 x))
-                   (xy0- (- y0 x)))
-               (f x+ y+)
-               (f x+ y-)
-               (f x- y+)
-               (f x- y-)
-               (f x0y+ xy0+)
-               (f x0y+ xy0-)
-               (f x0y- xy0+)
-               (f x0y- xy0-)
-               (multiple-value-bind (y m) (if (plusp m)
-                                              (values (1- y) (- m (* 8 y)))
-                                              (values y m))
-                 (when (<= x y)
-                   (put (1+ x)
-                        y
-                        (+ m 4 (* 8 x))))))))
+	     (funcall draw-function x y))
+	   (put (x y m)
+	     (let ((x+ (+ x0 x))
+		   (x- (- x0 x))
+		   (y+ (+ y0 y))
+		   (y- (- y0 y))
+		   (x0y+ (+ x0 y))
+		   (x0y- (- x0 y))
+		   (xy0+ (+ y0 x))
+		   (xy0- (- y0 x)))
+	       (f x+ y+)
+	       (f x+ y-)
+	       (f x- y+)
+	       (f x- y-)
+	       (f x0y+ xy0+)
+	       (f x0y+ xy0-)
+	       (f x0y- xy0+)
+	       (f x0y- xy0-)
+	       (multiple-value-bind (y m) (if (plusp m)
+					      (values (1- y) (- m (* 8 y)))
+					      (values y m))
+		 (when (<= x y)
+		   (put (1+ x)
+			y
+			(+ m 4 (* 8 x))))))))
     (put 0 radius (- 5 (* 4 radius)))
     (values)))
 
@@ -85,6 +94,7 @@
 
 (defun update-time ()
   (multiple-value-bind (_ min hour) (get-decoded-time)
+    (declare (ignore _))
     (setf *min* min
 	  *hour* hour)))
 
@@ -159,18 +169,23 @@
 (defparameter *padding* 0)
 (defparameter *offset* (+ *padding* (/ *window-height* 2)))
 
+(defun timer-exists? ()
+    (member 'clock-timer (sb-ext:list-all-timers) :test #'equal :key #'sb-ext:timer-name))
+
 (defun start-timer ()
-  (let ((timer (sb-ext:make-timer #'update-time)))
-    (sb-ext:schedule-timer timer 1.0 :repeat-interval 30.0)
-    timer))
+  (unless (timer-exists?)
+    (let ((timer (sb-ext:make-timer #'update-time :name 'clock-timer)))
+      (sb-ext:schedule-timer timer 1.0 :repeat-interval 30.0)
+      timer)))
 
 (defun stop-timers ()
   (dolist (timer (sb-ext:list-all-timers))
-    (sb-ext:unschedule-timer timer)))
+    (when (equal (sb-ext:timer-name timer) 'clock-timer)
+      (sb-ext:unschedule-timer timer))))
 
 (defun printf (format-str &rest args)
   (destructuring-bind (a) args
-      (print (format nil format-str a))))
+    (print (format nil format-str a))))
 
 ;;; TODO: This is shit
 (defun handle-window-event (w)
@@ -192,21 +207,25 @@
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
+     (sdl2:set-hint :render-scale-quality "1")
      (sdl2:with-window (,window
-                        :title "clock"
-                        :w *window-width*
-                        :h *window-height*
-                        :flags '(:shown))
+			:title "clock"
+			:w *window-width*
+			:h *window-height*
+			:flags '(:shown))
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
-         ,@body))))
+	 ,@body))))
 
-(defun run ()
+(defun init (init-state)
   (update-time)
-  ;; (start-timer)
+  (start-timer)
+  ;; TTF Init
   (with-window-renderer (window renderer)
-    (sdl2:set-hint :render-scale-quality "1")
+    (sdl2-ttf:init)
     (sdl2:with-event-loop (:method :poll)
+      ;; Destroy textures
       (:quit () t)
+
       (:wait () t)
 
       (:keydown (:keysym keysym)
@@ -217,7 +236,7 @@
 		   )))
 
       (:windowevent () (handle-window-event window))
-      
+      ;; Render date
       (:idle ()
 	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	     (sdl2:render-clear renderer)
@@ -225,3 +244,6 @@
 	     (draw *window-height* *min* *hour* renderer)
 	     (sdl2:delay 100)
 	     (sdl2:render-present renderer)))))
+
+(defun run ()
+  (init init-state))

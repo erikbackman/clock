@@ -1,5 +1,7 @@
 (defpackage #:clock
-  (:use :cl))
+  (:use :cl)
+  (:export :run
+	   :*padding*))
 
 (in-package #:clock)
 
@@ -82,6 +84,7 @@
 (defvar *1second* 1000)
 (defvar *1min-rad* (/ pi 30))
 (defvar *1hour-rad* (/ pi 6))
+(defparameter *padding* 0)
 
 (defun mil-hour (hour)
   (cond
@@ -108,10 +111,10 @@
      renderer x0 y0
      (+ x0 x1) (+ y0 y1))))
 
-(defun mark-at-angle (angle)
+(defun mark-at-angle (angle win-h)
   (let* ((magnitude 10)
-	 (radius (- *padding* (/ *window-height* 2))) ; TODO: make window-height an argument
-	 (offset (/ *window-height* 2))
+	 (radius (- *padding* (/ win-h 2)))
+	 (offset (/ win-h 2))
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
 	 (y-start (+ offset (imagpart point)))
@@ -130,9 +133,9 @@
 	  for a = (* n step)
 	  :collect a)))
 
-(defun draw-marks (renderer)
+(defun draw-marks (renderer win-h)
   (dolist (angle *mark-angles*)
-    (multiple-value-bind (x0 y0 x y) (mark-at-angle angle)
+    (multiple-value-bind (x0 y0 x y) (mark-at-angle angle win-h)
       (sdl2-ffi.functions:sdl-render-draw-line-f
        renderer
        x0 y0
@@ -147,21 +150,14 @@
 	      (make-vec2 :v1 (realpart point)
 			 :v2 (imagpart point)))))
 
-(defun draw-min-hand (renderer angle)
-  (draw-hand renderer (* 80 (/ *window-height* 200)) angle *window-height*))
+(defun draw-min-hand (renderer angle win-h)
+  (draw-hand renderer (* 80 (/ win-h 200)) angle win-h))
 
-(defun draw-hour-hand (renderer angle)
-  (draw-hand renderer (* 50 (/ *window-height* 200)) angle *window-height*))
+(defun draw-hour-hand (renderer angle win-h)
+  (draw-hand renderer (* 50 (/ win-h 200)) angle win-h))
 
 ;;; Main
-(defparameter *window-width* 500)
-(defparameter *window-height* 500)
-
-(defparameter *clock-radius* (/ *window-height* 2))
-(defparameter *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
-
-(defparameter *padding* 0)
-(defparameter *offset* (+ *padding* (/ *window-height* 2)))
+(defvar *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
 
 (defun timer-exists? ()
     (member 'clock-timer (sb-ext:list-all-timers) :test #'equal :key #'sb-ext:timer-name))
@@ -181,38 +177,31 @@
   (destructuring-bind (a) args
     (print (format nil format-str a))))
 
-;;; TODO: This is shit
-(defun handle-window-event (w)
-  (let ((size (sdl2:get-window-size w)))
-    (setf *window-height* size
-	  *window-width* size
-	  *clock-radius* (round (/ size 2))
-	  *offset* (+ *padding* (/ *window-height* 2)))))
-
 (defun draw (wh min hour renderer)
   (let* ((h/2 (round (/ wh 2)))
 	 (x0 h/2)
 	 (y0 h/2)
 	 (radius (- h/2 *padding*)))
     (draw-circle (lambda (x y) (sdl2:render-draw-point renderer x y)) x0 y0 radius)
-    (draw-marks renderer)
-    (draw-min-hand renderer (min->rad min))
-    (draw-hour-hand renderer (hour->rad hour min))))
+    (draw-marks renderer wh)
+    (draw-min-hand renderer (min->rad min) wh)
+    (draw-hour-hand renderer (hour->rad hour min) wh)))
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
      (sdl2:set-hint :render-scale-quality "1")
      (sdl2:with-window (,window
 			:title "clock"
-			:w *window-width*
-			:h *window-height*
+			:w 500
+			:h 500
 			:flags '(:shown))
        (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
 	 ,@body))))
 
 (defun start-clock ()
   (let ((min 0)
-	(hour 0))
+	(hour 0)
+	(win-h *window-height*))
 
     (flet ((update-time ()
 	     (multiple-value-bind (_ m h) (get-decoded-time)
@@ -225,22 +214,17 @@
     (with-window-renderer (window renderer)
       (sdl2:with-event-loop (:method :poll)
 	(:quit () t)
-
 	(:wait () t)
-
 	(:keydown (:keysym keysym)
 		  (case (sdl2:scancode keysym)
 		    (:scancode-escape
-		     (stop-timers)
-		     ;; (sdl2:quit)
-		     )))
-
-	(:windowevent () (handle-window-event window))
+		     (stop-timers))))
+	(:windowevent () (setf win-h (sdl2:get-window-size window)))
 	(:idle ()
 	       (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
 	       (sdl2:render-clear renderer)
 	       (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	       (draw *window-height* min hour renderer)
+	       (draw win-h min hour renderer)
 	       (sdl2:delay 100)
 	       (sdl2:render-present renderer))))))
 

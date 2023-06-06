@@ -12,6 +12,13 @@
 (require :sdl2-ttf)
 (require :cl-opengl)
 
+;;;
+
+(defun values-of (type &rest args)
+  (values-list
+   (loop for a in args
+	 collect (coerce a type))))
+
 ;;; Vector stuff
 (defstruct vec2 v1 v2)
 
@@ -76,9 +83,6 @@
 (defvar *1min-rad* (/ pi 30))
 (defvar *1hour-rad* (/ pi 6))
 
-(defparameter *min* 0)
-(defparameter *hour* 0)
-
 (defun mil-hour (hour)
   (cond
     ((zerop hour) 12)
@@ -90,21 +94,10 @@
   (if (>= min 60) hour
       (* (+ hour (/ min 60)) *1hour-rad*)))
 
-(defun update-time ()
-  (multiple-value-bind (_ min hour) (get-decoded-time)
-    (declare (ignore _))
-    (setf *min* min
-	  *hour* hour)))
-
 (defun cis-sf (angle)
   (let ((c (cis angle)))
     (complex (coerce (realpart c) 'single-float)
 	     (coerce (imagpart c) 'single-float))))
-
-(defun values-of (type &rest args)
-  (values-list
-   (loop for a in args
-	 collect (coerce a type))))
 
 (defun drawline (renderer from to)
   (let ((x0 (vec2-v1 from))
@@ -173,9 +166,9 @@
 (defun timer-exists? ()
     (member 'clock-timer (sb-ext:list-all-timers) :test #'equal :key #'sb-ext:timer-name))
 
-(defun start-timer ()
+(defun start-timer (callback)
   (unless (timer-exists?)
-    (let ((timer (sb-ext:make-timer #'update-time :name 'clock-timer)))
+    (let ((timer (sb-ext:make-timer callback :name 'clock-timer)))
       (sb-ext:schedule-timer timer 1.0 :repeat-interval 30.0)
       timer)))
 
@@ -218,28 +211,37 @@
 	 ,@body))))
 
 (defun start-clock ()
-  (update-time)
-  (start-timer)
-  (with-window-renderer (window renderer)
-    (sdl2:with-event-loop (:method :poll)
-      (:quit () t)
+  (let ((min 0)
+	(hour 0))
 
-      (:wait () t)
+    (flet ((update-time ()
+	     (multiple-value-bind (_ m h) (get-decoded-time)
+	       (declare (ignore _))
+	       (setf min m
+		     hour h))))
+      (update-time)
+      (start-timer #'update-time))
 
-      (:keydown (:keysym keysym)
-		(case (sdl2:scancode keysym)
-		  (:scancode-escape
-		   (stop-timers)
-		   ;; (sdl2:quit)
-		   )))
+    (with-window-renderer (window renderer)
+      (sdl2:with-event-loop (:method :poll)
+	(:quit () t)
 
-      (:windowevent () (handle-window-event window))
-      (:idle ()
-	     (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
-	     (sdl2:render-clear renderer)
-	     (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
-	     (draw *window-height* *min* *hour* renderer)
-	     (sdl2:delay 100)
-	     (sdl2:render-present renderer)))))
+	(:wait () t)
+
+	(:keydown (:keysym keysym)
+		  (case (sdl2:scancode keysym)
+		    (:scancode-escape
+		     (stop-timers)
+		     ;; (sdl2:quit)
+		     )))
+
+	(:windowevent () (handle-window-event window))
+	(:idle ()
+	       (sdl2:set-render-draw-color renderer #x00 #x00 #x00 #x00)
+	       (sdl2:render-clear renderer)
+	       (sdl2:set-render-draw-color renderer #xFF #xFF #xFF #xFF)
+	       (draw *window-height* min hour renderer)
+	       (sdl2:delay 100)
+	       (sdl2:render-present renderer))))))
 
 (defun run () (start-clock))

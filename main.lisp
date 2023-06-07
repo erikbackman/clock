@@ -187,7 +187,7 @@
     (draw-min-hand renderer (min->rad min) wh)
     (draw-hour-hand renderer (hour->rad hour min) wh)))
 
-(defmacro with-window-renderer ((window renderer) &body body)
+(defmacro with-window-renderer ((window win-h renderer) &body body)
   `(sdl2:with-init (:video)
      (sdl2:set-hint :render-scale-quality "1")
      (sdl2:with-window (,window
@@ -195,23 +195,25 @@
 			:w 500
 			:h 500
 			:flags '(:shown))
-       (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
-	 ,@body))))
+       (let ((,win-h 500))
+	 (sdl2:with-renderer (,renderer ,window :index -1 :flags '(:accelerated))
+	   ,@body)))))
+
+(defmacro with-app-state ((min hour update-time) &body body)
+  `(let ((,min 0)
+	 (,hour 0))
+     (flet ((,update-time ()
+	      (multiple-value-bind (_ m h) (get-decoded-time)
+		(declare (ignore _))
+		(setf ,min m
+		      ,hour h))))
+       (progn ,@body))))
 
 (defun start-clock ()
-  (let ((min 0)
-	(hour 0)
-	(win-h *window-height*))
-
-    (flet ((update-time ()
-	     (multiple-value-bind (_ m h) (get-decoded-time)
-	       (declare (ignore _))
-	       (setf min m
-		     hour h))))
-      (update-time)
-      (start-timer #'update-time))
-
-    (with-window-renderer (window renderer)
+  (with-app-state (min hour update-time)
+    (update-time)
+    (start-timer #'update-time)
+    (with-window-renderer (window win-h renderer)
       (sdl2:with-event-loop (:method :poll)
 	(:quit () t)
 	(:wait () t)

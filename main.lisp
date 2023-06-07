@@ -84,6 +84,8 @@
 (defvar *1second* 1000)
 (defvar *1min-rad* (/ pi 30))
 (defvar *1hour-rad* (/ pi 6))
+(defvar *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
+
 (defparameter *padding* 0)
 
 (defun mil-hour (hour)
@@ -157,8 +159,6 @@
   (draw-hand renderer (* 50 (/ win-h 200)) angle win-h))
 
 ;;; Main
-(defvar *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
-
 (defun timer-exists? ()
     (member 'clock-timer (sb-ext:list-all-timers) :test #'equal :key #'sb-ext:timer-name))
 

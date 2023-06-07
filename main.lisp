@@ -201,7 +201,7 @@
 (defun start-clock ()
   (let ((min 0)
 	(hour 0)
-	(win-h *window-height*))
+	(win-h 500))
 
     (flet ((update-time ()
 	     (multiple-value-bind (_ m h) (get-decoded-time)

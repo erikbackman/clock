@@ -112,6 +112,7 @@
      (+ x0 x1) (+ y0 y1))))
 
 (defun mark-at-angle (angle win-h)
+  "Create a line segment at an angle representing an hour mark."
   (let* ((magnitude 10)
 	 (radius (- *padding* (/ win-h 2)))
 	 (offset (/ win-h 2))
@@ -120,7 +121,7 @@
 	 (y-start (+ offset (imagpart point)))
 	 (origin (v2 offset offset))
 	 (dir (v2* magnitude
-		   (norm
+		   (v2norm
 		    (v2- origin (make-vec2 :v1 x-start :v2 y-start)))))
 	 (x-end (+ x-start (vec2-v1 dir)))
 	 (y-end (+ y-start (vec2-v2 dir))))

@@ -1,55 +1,60 @@
-(defpackage #:clock
-  (:use :cl)
-  (:export :run
-	   :*padding*))
-
-(in-package #:clock)
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (ql:quickload "sdl2")
   (ql:quickload "sdl2-ttf")
   (ql:quickload "cl-opengl"))
 
+(defpackage #:clock
+  (:use :cl)
+  (:export :run
+   :*padding*))
+
+(in-package #:clock)
+
 (require :sdl2)
 (require :sdl2-ttf)
 (require :cl-opengl)
 
-;;;
+(defconstant +1second+ 1000)
+(defconstant +1min-rad+ (/ pi 30))
+(defconstant +1hour-rad+ (/ pi 6))
+(defconstant +zero-angle+ (- (/ pi 2))) ; as in twelve-o-clock
+(defconstant pi/6 (/ pi 6))
 
-(defun values-of (type &rest args)
-  (values-list
-   (loop for a in args
-	 collect (coerce a type))))
+(defparameter *padding* 0)
 
 ;;; Vector stuff
 (defstruct vec2 v1 v2)
 
-(defun sqr (n)
-  (expt n 2))
+(defun v2 (x y)
+  (make-vec2 :v1 x :v2 y))
 
-(defun magnitude (vec)
-  (sqrt (+ (sqr (vec2-v1 vec))
-	   (sqr (vec2-v2 vec)))))
+(defun v2* (c v)
+  (v2 (* c (vec2-v1 v))
+      (* c (vec2-v2 v))))
 
-(defun *vec (n vec)
-  (make-vec2 :v1 (* n (vec2-v1 vec))
-	     :v2 (* n (vec2-v2 vec))))
+(defun v2/ (v c)
+  (v2 (/ (vec2-v1 v) c)
+      (/ (vec2-v2 v) c)))
 
-(defun -vec (v1 v2)
-  (make-vec2 :v1 (- (vec2-v1 v1) (vec2-v1 v2))
-	     :v2 (- (vec2-v2 v1) (vec2-v2 v2))))
+(defun v2. (u v)
+  (+ (* (vec2-v1 u) (vec2-v1 v))
+     (* (vec2-v2 u) (vec2-v2 v))))
 
-(defun normalize (vec)
-  (*vec (/ 1 (magnitude vec)) vec))
+(defun v2- (u v)
+  (v2 (- (vec2-v1 u) (vec2-v1 v))
+      (- (vec2-v2 u) (vec2-v2 v))))
+
+(defun v2+ (u v)
+  (v2 (+ (vec2-v1 u) (vec2-v1 v))
+      (+ (vec2-v2 u) (vec2-v2 v))))
+
+(defun v2mag (u) (sqrt (v2. u u)))
+
+(defun v2norm (u) (v2/ u (v2mag u)))
+
+(defun sqr (n) (expt n 2))
 
 ;;; Draw functions
-(defun draw-circle-polar (draw-function x0 y0 radius)
-  (loop for n from 0 to 360
-	for angle = (/ (* n 3.142) 180)
-	do (funcall draw-function
-		    (+ x0 (* radius (cos angle)))
-		    (+ y0 (* radius (sin angle))))))
-
 (defun draw-circle (draw-function x0 y0 radius)
   (labels ((f (x y)
 	     (funcall draw-function x y))
@@ -81,23 +86,16 @@
     (values)))
 
 ;;; Clock
-(defvar *1second* 1000)
-(defvar *1min-rad* (/ pi 30))
-(defvar *1hour-rad* (/ pi 6))
-(defvar *zero-angle* (- (/ pi 2))) ; as in twelve-o-clock
-
-(defparameter *padding* 0)
-
 (defun mil-hour (hour)
   (cond
     ((zerop hour) 12)
     ((>= hour 13) (- hour 12))
     (t hour)))
 
-(defun min->rad (min) (* min *1min-rad*))
+(defun min->rad (min) (* min +1min-rad+))
 (defun hour->rad (hour min)
   (if (>= min 60) hour
-      (* (+ hour (/ min 60)) *1hour-rad*)))
+      (* (+ hour (/ min 60)) +1hour-rad+)))
 
 (defun cis-sf (angle)
   (let ((c (cis angle)))
@@ -120,20 +118,17 @@
 	 (point (* radius (cis-sf angle)))
 	 (x-start (+ offset (realpart point)))
 	 (y-start (+ offset (imagpart point)))
-	 (origin (make-vec2 :v1 offset :v2 offset))
-	 (dir (*vec magnitude
-		    (normalize
-		     (-vec origin (make-vec2 :v1 x-start :v2 y-start)))))
+	 (origin (v2 offset offset))
+	 (dir (v2* magnitude
+		   (norm
+		    (v2- origin (make-vec2 :v1 x-start :v2 y-start)))))
 	 (x-end (+ x-start (vec2-v1 dir)))
 	 (y-end (+ y-start (vec2-v2 dir))))
     (values x-start y-start
 	    x-end y-end)))
 
 (defvar *mark-angles*
-  (let ((step (/ pi 6)))
-    (loop for n from 0 to 12
-	  for a = (* n step)
-	  :collect a)))
+  (loop for n from 0 to 12 collect (* n pi/6)))
 
 (defun draw-marks (renderer win-h)
   (dolist (angle *mark-angles*)
@@ -144,13 +139,12 @@
        x y))))
 
 (defun draw-hand (renderer len angle win-h)
-  (let* ((adjusted-angle (+ *zero-angle* angle))
+  (let* ((adjusted-angle (+ +zero-angle+ angle))
 	 (x0 (coerce (/ win-h 2) 'single-float))
 	 (point (* (- len *padding*) (cis-sf adjusted-angle))))
     (drawline renderer
-	      (make-vec2 :v1 x0 :v2 x0)
-	      (make-vec2 :v1 (realpart point)
-			 :v2 (imagpart point)))))
+	      (v2 x0 x0)
+	      (v2 (realpart point) (imagpart point)))))
 
 (defun draw-min-hand (renderer angle win-h)
   (draw-hand renderer (* 80 (/ win-h 200)) angle win-h))
@@ -228,4 +222,7 @@
 	       (sdl2:delay 100)
 	       (sdl2:render-present renderer))))))
 
-(defun run () (start-clock))
+(defun run ()
+  (setf *padding* 20)
+  (unwind-protect (start-clock)
+    (stop-timers)))

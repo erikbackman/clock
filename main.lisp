@@ -183,7 +183,9 @@
 
 (defmacro with-window-renderer ((window renderer) &body body)
   `(sdl2:with-init (:video)
-     (sdl2:set-hint :render-scale-quality "1")
+     (sdl2:set-hint :render-scale-quality "2")
+     (sdl2:set-hint :render-line-method "3")
+     (sdl2:gl-set-attr :multisamplesamples 4)
      (sdl2:with-window (,window
 			:title "clock"
 			:w 500

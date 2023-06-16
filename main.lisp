@@ -1,6 +1,5 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (ql:quickload "sdl2")
-  (ql:quickload "sdl2-ttf")
   (ql:quickload "cl-opengl"))
 
 (defpackage #:clock
@@ -11,7 +10,6 @@
 (in-package #:clock)
 
 (require :sdl2)
-(require :sdl2-ttf)
 (require :cl-opengl)
 
 (defconstant +1second+ 1000)
@@ -112,21 +110,14 @@
      (+ x0 x1) (+ y0 y1))))
 
 (defun mark-at-angle (angle win-h)
-  "Create a line segment at an angle representing an hour mark."
-  (let* ((magnitude 10)
-	 (radius (- *padding* (/ win-h 2)))
-	 (offset (/ win-h 2))
-	 (point (* radius (cis-sf angle)))
-	 (x-start (+ offset (realpart point)))
-	 (y-start (+ offset (imagpart point)))
-	 (origin (v2 offset offset))
-	 (dir (v2* magnitude
-		   (v2norm
-		    (v2- origin (make-vec2 :v1 x-start :v2 y-start)))))
-	 (x-end (+ x-start (vec2-v1 dir)))
-	 (y-end (+ y-start (vec2-v2 dir))))
-    (values x-start y-start
-	    x-end y-end)))
+  (flet ((line (a) (let ((c (* a (cis-sf angle)))
+			 (offset (/ win-h 2)))
+		     (cons (+ offset (realpart c))
+			   (+ offset (imagpart c))))))
+    (let* ((rad (- *padding* (/ win-h 2)))
+	   (p1 (line rad))
+	   (p0 (line (* 0.95 rad))))
+      (values (car p0) (cdr p0) (car p1) (cdr p1)))))
 
 (defvar *mark-angles*
   (loop for n from 0 to 12 collect (* n pi/6)))

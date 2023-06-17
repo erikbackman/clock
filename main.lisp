@@ -110,13 +110,13 @@
      (+ x0 x1) (+ y0 y1))))
 
 (defun mark-at-angle (angle win-h)
-  (flet ((line (a) (let ((c (* a (cis-sf angle)))
+  (flet ((pos (a) (let ((c (* a (cis-sf angle)))
 			 (offset (/ win-h 2)))
 		     (cons (+ offset (realpart c))
 			   (+ offset (imagpart c))))))
     (let* ((rad (- *padding* (/ win-h 2)))
-	   (p1 (line rad))
-	   (p0 (line (* 0.95 rad))))
+	   (p1 (pos rad))
+	   (p0 (pos (* 0.95 rad))))
       (values (car p0) (cdr p0) (car p1) (cdr p1)))))
 
 (defvar *mark-angles*

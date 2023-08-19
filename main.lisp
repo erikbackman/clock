@@ -1,16 +1,4 @@
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (ql:quickload "sdl2")
-  (ql:quickload "cl-opengl"))
-
-(defpackage #:clock
-  (:use :cl)
-  (:export :run
-   :*padding*))
-
 (in-package #:clock)
-
-(require :sdl2)
-(require :cl-opengl)
 
 (defconstant +1second+ 1000)
 (defconstant +1min-rad+ (/ pi 30))
@@ -216,7 +204,7 @@
 	       (sdl2:delay 100)
 	       (sdl2:render-present renderer))))))
 
-(defun run ()
+(defun main ()
   (setf *padding* 20)
   (unwind-protect (start-clock)
     (stop-timers)))

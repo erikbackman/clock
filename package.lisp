@@ -2,5 +2,5 @@
   (:use #:cl)
   (:import-from #:sdl2)
   (:export
-   :run
+   :main
    :*padding*))

@@ -2,4 +2,7 @@
 
 Yet another anolog clock
 
+* Dependencies
+- libsdl2
+
 
